@@ -1,4 +1,5 @@
-#!/usr/bin/env python3
+#This is the raspberry pi code, i ran it in command prompt
+#make sure you did spi connection right with your raspberry pi and camera, you can google the wiring :)
 
 import struct
 import threading
@@ -8,10 +9,12 @@ import spidev
 from flask import Flask, Response
 from pymavlink import mavutil
 
-# ------------------------------------------------------------------ settings
+# general settings
 
+#how the camera and pi communicate
 SPI_BUS = 0
 SPI_DEVICE = 0
+#the speed can be edited, this amount was a little laggy when tested in the air, but i recommend slowly increasing it bc spi timing can get weird if you increase too much
 SPI_SPEED = 25_000_000
 
 CHUNK_SIZE = 1000
@@ -21,13 +24,13 @@ PACKET_SIZE = HEADER_SIZE + CHUNK_SIZE
 FRAME_WIDTH = 160
 FRAME_HEIGHT = 120
 
-# The camera sends blob.cx / blob.cy, which are already the blob's CENTRE.
+# The camera sends blob.cx / blob.cy, which are the size/coordinates of the boxed red object
 BLOB_IS_CORNER = False
 
-CENTER_THRESHOLD = 12        # px dead-band, no command inside this
-YAW_GAIN = 0.004             # rad/s per px of error -- start small
-MAX_YAW_RATE = 0.5           # rad/s clamp
-FORWARD_VELOCITY = -0.5       # m/s -- leave at 0 until yaw tracking is proven
+CENTER_THRESHOLD = 12        
+YAW_GAIN = 0.004             
+MAX_YAW_RATE = 0.5           
+FORWARD_VELOCITY = -0.5       # idk why but it has to be negative to go forward, if it go backwads then switch it, i might jsut not know where the front of the drone was
 
 CONTROL_RATE_HZ = 10         # setpoint stream rate (ArduPilot wants >= 2 Hz)
 DETECTION_TIMEOUT = 0.5      # s without a blob before hovering
@@ -38,23 +41,21 @@ DRY_RUN = False
 
 
 
-# Hover instead of tracking until OpenMV side is fixed.
+
 MIN_TRACKING_FPS = 8.0
 
+# pull the id of your FC and run the command when you hook it up to your FC to figure it out
 MAVLINK_PORT = (
     "/dev/serial/by-id/"
     "usb-ArduPilot_microBlue_3D003F001451333239363937-if00"
 )
+#go into parameters and the port you use to figure out its baud rate
 MAVLINK_BAUD = 115200
 
-# bits 0-2  ignore position
-# bits 3-5  CLEAR -> use velocity
-# bits 6-8  ignore acceleration
-# bit  10   ignore yaw angle
-# bit  11   CLEAR -> use yaw_rate   <-- this was set in your original mask
+#this is a bitfield, so it tells the pi what parameters  the drone sends to ignore
 TYPE_MASK_VEL_YAWRATE = 0b0000011111000111
 
-# -------------------------------------------------------------------- state
+
 
 state_lock = threading.Lock()
 
@@ -62,14 +63,14 @@ latest_frame = None
 detection = {"cx": 0, "cy": 0, "valid": False, "t": 0.0}
 measured_fps = 0.0
 
-# ---------------------------------------------------------------------- SPI
+# SPI run
 
 spi = spidev.SpiDev()
 spi.open(SPI_BUS, SPI_DEVICE)
 spi.max_speed_hz = SPI_SPEED
 spi.mode = 0
 
-# ------------------------------------------------------------------ MAVLink
+# mavlink connection
 
 master = mavutil.mavlink_connection(
     MAVLINK_PORT,
@@ -81,7 +82,7 @@ master = mavutil.mavlink_connection(
 print("Waiting for FC heartbeat...")
 master.wait_heartbeat()
 print(
-    "MAVLink connected -- system",
+    "MAVLink connected system",
     master.target_system,
     "component",
     master.target_component,
@@ -102,12 +103,8 @@ def mavlink_reader():
 
 
 def heartbeat_sender():
-    """Announce the Pi at 1 Hz.
-
-    Identifies as an onboard controller, not a GCS. If FS_GCS_ENABLE is on
-    and you want the Pi to satisfy that failsafe, set SYSID_MYGCS on the FC
-    to match this connection's source_system (250) -- do NOT set the Pi to
-    255, which Mission Planner already uses.
+    """Announce the Pi at 1 Hz
+    yay then its connected
     """
     while True:
         try:
@@ -151,7 +148,7 @@ def hover():
     send_velocity_body(0.0, 0.0, 0.0, 0.0)
 
 
-# ------------------------------------------------------------- control loop
+#  control loop
 
 def tracking_command(cx, cy):
     """Return (forward_velocity, yaw_rate) for a blob centre at cx, cy."""
@@ -217,7 +214,9 @@ def control_loop():
         time.sleep(max(0.0, period - elapsed))
 
 
-# ------------------------------------------------------------ SPI receiver
+# SPI receiver code
+#its a low level protcol, so basically the bytes that the camera stream sends have to be manually fomatted 
+#magic bytes identify commands, and chunks manage payload sizes  from the camera, but hey, magic is a pretty cool name, nice work software people
 
 def receive_frames():
     global latest_frame
@@ -321,7 +320,7 @@ def receive_frames():
             time.sleep(1)
 
 
-# -------------------------------------------------------------------- Flask
+# flask camera stream, this code streams the camera feed on your computer through a web browser link that it generates
 
 app = Flask(__name__)
 
@@ -342,7 +341,7 @@ def generate_frames():
 def index():
     return (
         "<!DOCTYPE html><html><head><title>Camera</title></head><body>"
-        "<h1>Camera Stream</h1>"
+        "<h1>Super Amazing Camera Stream</h1>"
         '<img src="/video" width="640" height="480">'
         "</body></html>"
     )
@@ -356,7 +355,8 @@ def video():
     )
 
 
-# --------------------------------------------------------------------- main
+#  if everything is good it will generate the link and stream
+#watch the magic happen, electronics are so fun
 
 if __name__ == "__main__":
     for target in (mavlink_reader, heartbeat_sender, receive_frames, control_loop):
@@ -364,3 +364,4 @@ if __name__ == "__main__":
 
     print("http://<PI-IP>:5000")
     app.run(host="0.0.0.0", port=5000, threaded=True, use_reloader=False)
+#random suggestion,  make the target hot pink, i think that would be super fun, or any non natural occuring color,and don't wear that color when testing or its gonna chase you, great joke tho if you set the speed to really low :)
