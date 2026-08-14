@@ -30,7 +30,7 @@ BLOB_IS_CORNER = False
 CENTER_THRESHOLD = 12        
 YAW_GAIN = 0.004             
 MAX_YAW_RATE = 0.5           
-FORWARD_VELOCITY = -0.5       # idk why but it has to be negative to go forward, if it go backwads then switch it, i might jsut not know where the front of the drone was
+FORWARD_VELOCITY = -0.5       # in m/s, idk why but it has to be negative to go forward, if it go backwads then switch it, i might jsut not know where the front of the drone was
 
 CONTROL_RATE_HZ = 10         # setpoint stream rate (ArduPilot wants >= 2 Hz)
 DETECTION_TIMEOUT = 0.5      # s without a blob before hovering
