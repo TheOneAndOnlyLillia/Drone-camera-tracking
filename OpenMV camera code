@@ -22,13 +22,13 @@ red_threshold = (10, 100, 30, 127, -40, 80)
 
 spi = SPI(
     2,
-    SPI.SLAVE,
+    spi.slave,
     polarity=0,
     phase=0
 )
 
 # Keep this below the Pi's 4096-byte limit.
-CHUNK_SIZE = 1000
+chunk_size = 1000
 
 clock = time.clock()
 
@@ -99,10 +99,10 @@ while True:
 
     for chunk_num in range(total_chunks):
 
-        start = chunk_num * CHUNK_SIZE
+        start = chunk_num * chunk_size
 
         end = min(
-            start + CHUNK_SIZE,
+            start + chunk_size,
             jpeg_len
         )
 
@@ -134,7 +134,7 @@ while True:
       
 
         while len(packet) < (
-            20 + CHUNK_SIZE
+            20 + chunk_size
         ):
 
             packet.append(0)
@@ -149,7 +149,7 @@ while True:
         except Exception as e:
 
             print(
-                "SPI ERROR:",
+                "spi error :(",
                 e
             )
 
