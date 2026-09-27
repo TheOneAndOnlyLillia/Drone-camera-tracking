@@ -12,48 +12,48 @@ from pymavlink import mavutil
 # general settings
 
 #how the camera and pi communicate
-SPI_BUS = 0
-SPI_DEVICE = 0
+spi_bus = 0
+spi_device = 0
 #the speed can be edited, this amount was a little laggy when tested in the air, but i recommend slowly increasing it bc spi timing can get weird if you increase too much
-SPI_SPEED = 25_000_000
+spi_speed = 25_000_000
 
-CHUNK_SIZE = 1000
-HEADER_SIZE = 20
-PACKET_SIZE = HEADER_SIZE + CHUNK_SIZE
+chunk_size = 1000
+header_size = 20
+packet_size = header_size + chunk_size
 
-FRAME_WIDTH = 160
-FRAME_HEIGHT = 120
+frame_width = 160
+frame_height = 120
 
 # The camera sends blob.cx / blob.cy, which are the size/coordinates of the boxed red object
-BLOB_IS_CORNER = False
+blob_is_corner = False
 
-CENTER_THRESHOLD = 12        
-YAW_GAIN = 0.004             
-MAX_YAW_RATE = 0.5           
-FORWARD_VELOCITY = -0.5       # in m/s, idk why but it has to be negative to go forward, if it go backwads then switch it, i might jsut not know where the front of the drone was
+center_threshold = 12        
+yaw_gain = 0.004             
+max_yaw_rate = 0.5           
+forward_velocity = -0.5       # in m/s, idk why but it has to be negative to go forward, if it go backwads then switch it, i might jsut not know where the front of the drone was
 
-CONTROL_RATE_HZ = 10         # setpoint stream rate (ArduPilot wants >= 2 Hz)
-DETECTION_TIMEOUT = 0.5      # s without a blob before hovering
-REQUIRE_GUIDED = True        # don't fight the pilot in other modes
+control_rate_hz = 10         # setpoint stream rate (ArduPilot wants >= 2 Hz)
+detection_timeout = 0.5      # s without a blob before hovering
+require_guided = True        # don't fight the pilot in other modes
 
 # make dry run true if you want it to send 0 commands to FC for testing
-DRY_RUN = False
+dry_run = False
 
 
 
 
-MIN_TRACKING_FPS = 8.0
+min_tracking_fps = 8.0
 
 # pull the id of your FC and run the command when you hook it up to your FC to figure it out
-MAVLINK_PORT = (
+mavlink_port = (
     "/dev/serial/by-id/"
     "usb-ArduPilot_microBlue_3D003F001451333239363937-if00"
 )
 #go into parameters and the port you use to figure out its baud rate
-MAVLINK_BAUD = 115200
+mavlink_baud = 115200
 
 #this is a bitfield, so it tells the pi what parameters  the drone sends to ignore
-TYPE_MASK_VEL_YAWRATE = 0b0000011111000111
+type_mask_vel_yawrate = 0b0000011111000111
 
 
 
@@ -66,15 +66,15 @@ measured_fps = 0.0
 # SPI run
 
 spi = spidev.SpiDev()
-spi.open(SPI_BUS, SPI_DEVICE)
-spi.max_speed_hz = SPI_SPEED
+spi.open(spi_bus, spi_device)
+spi.max_speed_hz = spi_speed
 spi.mode = 0
 
 # mavlink connection
 
 master = mavutil.mavlink_connection(
-    MAVLINK_PORT,
-    baud=MAVLINK_BAUD,
+    mavlink_port,
+    baud=mavlink_baud,
     source_system=250,
     source_component=191,
 )
@@ -88,8 +88,8 @@ print(
     master.target_component,
 )
 
-TARGET_SYSTEM = master.target_system
-TARGET_COMPONENT = mavutil.mavlink.MAV_COMP_ID_AUTOPILOT1
+target_system = master.target_system
+target_component = mavutil.mavlink.MAV_COMP_ID_AUTOPILOT1
 
 
 def mavlink_reader():
@@ -120,7 +120,7 @@ def heartbeat_sender():
 
 def send_velocity_body(vx, vy, vz, yaw_rate):
     """Body-frame velocity setpoint. All zeros == hold position."""
-    if DRY_RUN:
+    if dry_run:
         if yaw_rate > 0.001:
             direction = "-> RIGHT (clockwise)"
         elif yaw_rate < -0.001:
@@ -132,10 +132,10 @@ def send_velocity_body(vx, vy, vz, yaw_rate):
 
     master.mav.set_position_target_local_ned_send(
         int(time.monotonic() * 1000) & 0xFFFFFFFF,
-        TARGET_SYSTEM,
-        TARGET_COMPONENT,
+        target_system,
+        target_component,
         mavutil.mavlink.MAV_FRAME_BODY_NED,
-        TYPE_MASK_VEL_YAWRATE,
+        type_mask_vel_yawrate,
         0.0, 0.0, 0.0,          # x, y, z      (ignored)
         vx, vy, vz,             # velocity
         0.0, 0.0, 0.0,          # accel        (ignored)
@@ -152,22 +152,22 @@ def hover():
 
 def tracking_command(cx, cy):
     """Return (forward_velocity, yaw_rate) for a blob centre at cx, cy."""
-    error_x = cx - (FRAME_WIDTH // 2)
+    error_x = cx - (frame_width // 2)
 
-    if abs(error_x) <= CENTER_THRESHOLD:
+    if abs(error_x) <= center_threshold:
         yaw_rate = 0.0
     else:
-        yaw_rate = max(-MAX_YAW_RATE, min(MAX_YAW_RATE, error_x * YAW_GAIN))
+        yaw_rate = max(-max_yaw_rate, min(max_yaw_rate, error_x * yaw_gain))
 
-    if DRY_RUN:
+    if dry_run:
         side = "RIGHT" if error_x > 0 else "LEFT" if error_x < 0 else "CENTER"
         print(f"blob cx={cx:3d} err={error_x:+4d} (object is {side})")
 
-    return FORWARD_VELOCITY, yaw_rate
+    return forward_velocity, yaw_rate
 
 
 def control_loop():
-    period = 1.0 / CONTROL_RATE_HZ
+    period = 1.0 / control_rate_hz
     last_state = None
 
     while True:
@@ -177,10 +177,10 @@ def control_loop():
             d = dict(detection)
             fps = measured_fps
 
-        fresh = d["valid"] and (time.monotonic() - d["t"]) < DETECTION_TIMEOUT
-        fast_enough = fps >= MIN_TRACKING_FPS
+        fresh = d["valid"] and (time.monotonic() - d["t"]) < detection_timeout
+        fast_enough = fps >= min_tracking_fps
 
-        if REQUIRE_GUIDED and not DRY_RUN and master.flightmode != "GUIDED":
+        if require_guided and not dry_run and master.flightmode != "GUIDED":
             if last_state != "not_guided":
                 print("Mode is", master.flightmode, "-- not sending setpoints")
                 last_state = "not_guided"
@@ -199,7 +199,7 @@ def control_loop():
                 if last_state != "too_slow":
                     print(
                         f"TARGET SEEN but only {fps:.1f} fps "
-                        f"(need {MIN_TRACKING_FPS:.0f}) -- HOVERING"
+                        f"(need {min_tracking_fps:.0f}) -- HOVERING"
                     )
                     last_state = "too_slow"
             else:
@@ -234,7 +234,7 @@ def receive_frames():
 
     while True:
         try:
-            data = bytes(spi.xfer2([0] * PACKET_SIZE))
+            data = bytes(spi.xfer2([0] * packet_size))
 
             now = time.monotonic()
             if now - last_report >= 2.0:
@@ -255,13 +255,13 @@ def receive_frames():
             (
                 magic, cx, cy, bw, bh,
                 jpeg_len, chunk_num, total_chunks, chunk_len,
-            ) = struct.unpack("<HhhhhIHHH", data[:HEADER_SIZE])
+            ) = struct.unpack("<HhhhhIHHH", data[:header_size])
 
             if magic != 0x55AA:
                 stats["magic"] += 1
                 continue
 
-            if chunk_len > CHUNK_SIZE:
+            if chunk_len > chunk_size:
                 stats["len"] += 1
                 continue
 
@@ -279,7 +279,7 @@ def receive_frames():
             if current_frame is None:
                 continue
 
-            current_frame.extend(data[HEADER_SIZE:HEADER_SIZE + chunk_len])
+            current_frame.extend(data[header_size:header_size + chunk_len])
             expected_chunk += 1
 
             if chunk_num + 1 != total_chunks_expected:
@@ -297,7 +297,7 @@ def receive_frames():
      
             has_blob = f_bw > 0 and f_bh > 0 and f_cx >= 0 and f_cy >= 0
 
-            if has_blob and BLOB_IS_CORNER:
+            if has_blob and blob_is_corner:
                 center_x = f_cx + f_bw // 2
                 center_y = f_cy + f_bh // 2
             else:
