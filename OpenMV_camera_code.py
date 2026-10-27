@@ -13,7 +13,7 @@ sensor.reset()
 sensor.set_pixformat(sensor.RGB565)
 sensor.set_framesize(sensor.QQVGA)   # 160 x 120
 sensor.skip_frames(time=2000)
-# this threshold is for like a bright red object for inside lighting, if you go to machine vision you can edit the threshold, so the lighting would be a little dfferent outside and i recommend editing it accordingly
+# this threshold is for like a bright red object for inside/bright outside lighting, if you go to machine vision you can edit the threshold, so the lighting would be a little dfferent outside and i recommend editing it accordingly
 red_threshold = (10, 100, 30, 127, -40, 80)
 
 
